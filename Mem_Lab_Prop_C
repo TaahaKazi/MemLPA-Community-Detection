@@ -82,7 +82,7 @@ void MemLPA(vector<vector<float>>adjacency_matrix)
             label_history[index][j] = labels[j];
 
         for (int j=0; j<n_nodes; j++)
-            AL[j] = all_of(&label_history[0][j], &label_history[3][j], [&](int i){return i==labels[j];}); //Ignore this, I will correct it tonight
+            AL[j] = all_of(&label_history[0][j], &label_history[3][j], [&](int i){return i==labels[j];}); //To be improved
 
         cout<<"\n\nAL : ";
         for(int i=0; i<n_nodes; i++)
