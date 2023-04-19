@@ -10,17 +10,20 @@ using namespace std;
 void MemLPA(vector<vector<float>>adjacency_matrix)
 {
     int n_nodes = adjacency_matrix.size();
-    vector<int> labels(n_nodes,0);
-    unordered_map<int, unordered_map<int, float>> mem;
+    vector<int> labels(n_nodes,0); // optimize to direct initialization
+    unordered_map<int, unordered_map<int, float>> mem;  // Is this the best data structure?
 
     for(int i=0; i<n_nodes; i++)
     {
         labels[i]=i;
         mem[i]={};
     }
-    vector<bool> AL(n_nodes,0);
-    vector<vector<float>> label_history(3, vector<float>(n_nodes, 0.0));
 
+    vector<bool> AL(n_nodes,0);  // Active List Check
+
+
+    vector<vector<float>> label_history(3, vector<float>(n_nodes, 0.0)); // label history
+    // can we do this in the step before?
     default_random_engine generator;
     normal_distribution<double> distribution(0.0, 1.0);
     for (int i = 0; i < 3; i++)
@@ -28,33 +31,57 @@ void MemLPA(vector<vector<float>>adjacency_matrix)
             label_history[i][j] = distribution(generator);
 
     int n_iteration = 0;
-    while (find(AL.begin(), AL.end(), false) != AL.end()&&n_iteration<20)
+
+    // Add neighborhood code
+
+    unordered_map<int, unordered_map<int, float>> global_neighbor_labels;
+
+    /*
+    for (auto& pair : global_neighbor_labels) {
+        for (auto& pair2 : pair.second
+             {
+                 pair2.second = 0.0 ;
+             }
+    }*/
+    //while (find(AL.begin(), AL.end(), false) != AL.end()&&n_iteration<20)
+    while (find(AL.begin(), AL.end(), false) != AL.end())
+    // parallelize this check step, CUDA code probably
     {
+        cout<<"\nIter : "<<n_iteration<<"\n";
+
+        // core of parallelization
         for(int node=0; node < n_nodes; node++)
         {
             if(!AL[node])
             {
+                // no use in initializing it every iteration!
+                //unordered_map<int,float> neighbor_labels;
 
-                unordered_map<int,float> neighbor_labels;
+                // change this to adjacency list for faster access
+
+                unordered_map<int, float> neighbor_labels = global_neighbor_labels[node];
+
                 for (int neighbor = 0; neighbor < n_nodes; neighbor++)
+
                 {
                     float edge = adjacency_matrix[node][neighbor];
                     if (edge != 0)
                     {
-                        if (neighbor_labels.count(labels[neighbor]) == 0)
+                        /*if (neighbor_labels.count(labels[neighbor]) == 0)
                             neighbor_labels[labels[neighbor]] = edge;
-                        else
+                        else*/
                             neighbor_labels[labels[neighbor]] += edge;
                     }
                 }
+
                 for (auto& label_score : neighbor_labels)
                 {
                     float label = label_score.first;
                     cout<<label<<" ";
                     float score = label_score.second;
-                    if (mem[node].count(label) == 0)
+                    /*if (mem[node].count(label) == 0)
                         mem[node][label] = score;
-                    else
+                    else*/
                         mem[node][label] += score;
                 }
             }
@@ -77,12 +104,37 @@ void MemLPA(vector<vector<float>>adjacency_matrix)
             }
         }
 
-        int index = n_iteration % (sizeof(label_history)/sizeof(label_history[0]));
+        //int index = n_iteration % (sizeof(label_history)/sizeof(label_history[0]));
+        int index = n_iteration % 3;
+        printf("\nIndex:\t");
+        printf("%d\n", index);
+
+        printf("\nLabels:\n");
+        for (int j=0; j<n_nodes; j++)
+            printf("%d\t", labels[j]);
+        printf("\n");
+
+
         for (int j=0; j<n_nodes; j++)
             label_history[index][j] = labels[j];
 
+
+        printf("Hello \n");
+        for (int i = 0; i < 3; i++){
+            for (int j = 0; j < n_nodes; j++){
+                printf("%f\t", label_history[i][j]);
+            }
+            printf("\n");
+        }
+        printf("Bye\n");
+
         for (int j=0; j<n_nodes; j++)
-            AL[j] = all_of(&label_history[0][j], &label_history[3][j], [&](int i){return i==labels[j];}); //To be improved
+        {
+            if(label_history[0][j]==label_history[1][j])
+                if(label_history[1][j]==label_history[2][j])
+                    AL[j]=1;
+        }
+            //AL[j] = all_of(&label_history[0][j], &label_history[3][j], [&](int i){return i==labels[j];}); //To be improved
 
         cout<<"\n\nAL : ";
         for(int i=0; i<n_nodes; i++)
@@ -118,15 +170,26 @@ int main()
 {
     // Create an example adjacency matrix
     vector<vector<float>> adjacency_matrix =  {{0, 1.0, 0.7, 0, 0, 0, 0, 0, 0, 0},
-                                                {1.0, 0, 0.8, 0, 0, 0, 0.2, 0, 0, 0},
+                                                {1.0, 0, 0.8, 0, 0, 0, 1, 0, 0, 0},
                                                 {0.7, 0.8, 0, 0.3, 0, 0, 0, 0, 0, 0},
                                                 {0, 0, 0.3, 0, 0.7, 0.8, 0, 0, 0, 0},
                                                 {0, 0, 0, 0.7, 0, 0.9, 0, 0, 0, 0},
-                                                {0, 0, 0, 0.8, 0.9, 0, 0, 0, 0, 0.3},
+                                                {0, 0, 0, 0.8, 0.9, 0, 0, 0, 0, 0.9},
                                                 {0, 0.2, 0, 0, 0, 0, 0, 0.9, 0.7, 0.8},
                                                 {0, 0, 0, 0, 0, 0, 0.9, 0, 0.5, 0.6},
                                                 {0, 0, 0, 0, 0, 0, 0.7, 0.5, 0, 0.4},
                                                 {0, 0, 0, 0, 0, 0.3, 0.8, 0.6, 0.4, 0}};
+
+    /*vector<vector<float>> adjacency_matrix =  {{0, 0.1, 0.2, 0, 0, 0, 0, 0, 0, 0},
+                                                {0.2, 0, 0.1, 0, 0, 0, 0.3, 0, 0, 0},
+                                                {0.1, 0.2, 0, 0.8, 0, 0, 0, 0, 0, 0},
+                                                {0, 0, 0.3, 0, 0.7, 0.8, 0, 0, 0, 0},
+                                                {0, 0, 0, 0.7, 0, 0.9, 0, 0, 0, 0},
+                                                {0, 0, 0, 0.8, 0.9, 0, 0, 0, 0, 0.9},
+                                                {0, 0.2, 0, 0, 0, 0, 0, 0.9, 0.7, 0.8},
+                                                {0, 0, 0, 0, 0, 0, 0.9, 0, 0.5, 0.6},
+                                                {0, 0, 0, 0, 0, 0, 0.7, 0.5, 0, 0.4},
+                                                {0, 0, 0, 0, 0, 0.3, 0.8, 0.6, 0.4, 0}};*/
 
     // Run the MemLPA algorithm
     MemLPA(adjacency_matrix);
