@@ -22,11 +22,11 @@ void MemLPA(vector<vector<float>>adjacency_matrix)
     vector<bool> AL(n_nodes,0);  // Active List Check
 
 
-    vector<vector<float>> label_history(3, vector<float>(n_nodes, 0.0)); // label history
+    vector<vector<float>> label_history(4, vector<float>(n_nodes, 0.0)); // label history
     // can we do this in the step before?
     default_random_engine generator;
     normal_distribution<double> distribution(0.0, 1.0);
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 4; i++)
         for (int j = 0; j < n_nodes; j++)
             label_history[i][j] = distribution(generator);
 
@@ -73,20 +73,23 @@ void MemLPA(vector<vector<float>>adjacency_matrix)
                             neighbor_labels[labels[neighbor]] += edge;
                     }
                 }
-
-                for (auto& label_score : neighbor_labels)
+                
+                // Code to find max scored label and assign it to labels vector
+                int max_key = -1;
+                float max_value = numeric_limits<float>::lowest();
+                for (const auto& kv : neighbor_labels)
                 {
-                    float label = label_score.first;
-                    cout<<label<<" ";
-                    float score = label_score.second;
-                    /*if (mem[node].count(label) == 0)
-                        mem[node][label] = score;
-                    else*/
-                        mem[node][label] += score;
+                    if (kv.second > max_value)
+                    {
+                        max_key = kv.first;
+                        max_value = kv.second;
+                    }
                 }
+                labels[node] = max_key;
             }
         }
 
+        /*
         for (int node = 0; node < AL.size(); node++)
         {
             bool is_active = AL[node];
@@ -103,9 +106,10 @@ void MemLPA(vector<vector<float>>adjacency_matrix)
                 labels[node] = max_key;
             }
         }
+        */
 
         //int index = n_iteration % (sizeof(label_history)/sizeof(label_history[0]));
-        int index = n_iteration % 3;
+        int index = n_iteration % 4;
         printf("\nIndex:\t");
         printf("%d\n", index);
 
@@ -120,7 +124,7 @@ void MemLPA(vector<vector<float>>adjacency_matrix)
 
 
         printf("Hello \n");
-        for (int i = 0; i < 3; i++){
+        for (int i = 0; i < 4; i++){
             for (int j = 0; j < n_nodes; j++){
                 printf("%f\t", label_history[i][j]);
             }
@@ -132,7 +136,8 @@ void MemLPA(vector<vector<float>>adjacency_matrix)
         {
             if(label_history[0][j]==label_history[1][j])
                 if(label_history[1][j]==label_history[2][j])
-                    AL[j]=1;
+                    if(label_history[2][j]==label_history[3][j])
+                        AL[j]=1;
         }
             //AL[j] = all_of(&label_history[0][j], &label_history[3][j], [&](int i){return i==labels[j];}); //To be improved
 
@@ -145,6 +150,7 @@ void MemLPA(vector<vector<float>>adjacency_matrix)
         for (auto x : labels)
             cout << x << " ";
         cout << endl;
+        /*
         cout << "Final Memory" << endl;
         for (int i = 0; i < n_nodes; i++)
         {
@@ -152,6 +158,7 @@ void MemLPA(vector<vector<float>>adjacency_matrix)
                 cout << x.first << ":" << x.second << " ";
             cout << endl;
         }
+        */
         cout << "Label History: " << endl;
         for (auto x : label_history)
         {
@@ -189,8 +196,8 @@ int main()
                                                 {0, 0.2, 0, 0, 0, 0, 0, 0.9, 0.7, 0.8},
                                                 {0, 0, 0, 0, 0, 0, 0.9, 0, 0.5, 0.6},
                                                 {0, 0, 0, 0, 0, 0, 0.7, 0.5, 0, 0.4},
-                                                {0, 0, 0, 0, 0, 0.3, 0.8, 0.6, 0.4, 0}};*/
-
+                                                {0, 0, 0, 0, 0, 0.3, 0.8, 0.6, 0.4, 0}};
+    */
     // Run the MemLPA algorithm
     MemLPA(adjacency_matrix);
 
