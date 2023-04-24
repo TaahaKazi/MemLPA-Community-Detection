@@ -1,0 +1,56 @@
+__global__ void compute_neigh_count(int nodes, int* all_neigh_count, float* added_neigh_count, float* prod_neigh_count, int* adjacency_matrix)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= nodes)
+        return;
+
+    int c = 0;
+    int int_neigh_count[nodes] = { 0 };
+    for (int j = 0; j < nodes; j++)
+        if (adjacency_matrix[i * nodes + j] != 0)
+        {
+            c++;
+            int_neigh_count[j] = 1;
+        }
+    all_neigh_count[i] = c;
+
+    for (int j = 0; j < nodes; j++)
+        if (j != i && adjacency_matrix[i * nodes + j] != 0)
+            for (int k = 0; k < nodes; k++)
+                if (adjacency_matrix[j * nodes + k] != 0 && int_neigh_count[k] != 0)
+                    int_neigh_count[j] += 1;
+
+    for (int j = 0; j < nodes; j++)
+        if (i != j)
+        {
+            float wtd_neigh_count = int_neigh_count[j] * 1.0 / all_neigh_count[i];
+            added_neigh_count[i * nodes + j] = adjacency_matrix[i * nodes + j] * 1.0 + wtd_neigh_count;
+            prod_neigh_count[i * nodes + j] = adjacency_matrix[i * nodes + j] * 1.0 * wtd_neigh_count;
+        }
+}
+
+void parallel_compute_neigh_count(int nodes, int* all_neigh_count, float* added_neigh_count, float* prod_neigh_count, int* adjacency_matrix)
+{
+    int* d_all_neigh_count, * d_adjacency_matrix;
+    float* d_added_neigh_count, * d_prod_neigh_count;
+
+    cudaMalloc((void**)&d_all_neigh_count, nodes * sizeof(int));
+    cudaMalloc((void**)&d_added_neigh_count, nodes * nodes * sizeof(float));
+    cudaMalloc((void**)&d_prod_neigh_count, nodes * nodes * sizeof(float));
+    cudaMalloc((void**)&d_adjacency_matrix, nodes * nodes * sizeof(int));
+
+    cudaMemcpy(d_adjacency_matrix, adjacency_matrix, nodes * nodes * sizeof(int), cudaMemcpyHostToDevice);
+
+    int threads_per_block = 256;
+    int num_blocks = (nodes + threads_per_block - 1) / threads_per_block;
+    compute_neigh_count << <num_blocks, threads_per_block >> > (nodes, d_all_neigh_count, d_added_neigh_count, d_prod_neigh_count, d_adjacency_matrix);
+
+    cudaMemcpy(all_neigh_count, d_all_neigh_count, nodes * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(added_neigh_count, d_added_neigh_count, nodes * nodes * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(prod_neigh_count, d_prod_neigh_count, nodes * nodes * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_all_neigh_count);
+    cudaFree(d_added_neigh_count);
+    cudaFree(d_prod_neigh_count);
+    cudaFree(d_adjacency_matrix);
+}
