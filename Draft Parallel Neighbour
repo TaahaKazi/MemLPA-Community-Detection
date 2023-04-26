@@ -78,6 +78,18 @@ __global__ void compute_wtd_neigh_count(int *d_neigh_count, int *d_degrees, floa
 
 }
 
+__global__ void add_prod_kernel(float *d_adjacency_matrix, float *d_wtd_neigh_count, float *d_added_neigh_count, float *d_prod_neigh_count, int nodes)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    if(i<nodes && j<nodes)
+    {
+        int index = i * nodes + j;
+        d_added_neigh_count[index] = d_adjacency_matrix[index] + d_wtd_neigh_count[index];
+        d_prod_neigh_count[index] = d_adjacency_matrix[index] * d_wtd_neigh_count[index];
+    }
+}
+
 
 int main()
 {
@@ -103,6 +115,8 @@ int main()
     int* d_int_neigh_count;
     int *d_neigh_count;
     float *d_wtd_neigh_count;
+    float *d_added_neigh_count;
+    float *d_prod_neigh_count;
     
     
 
@@ -111,10 +125,14 @@ int main()
     cudaMalloc((void **)&d_int_neigh_count, adjacency_size * sizeof(int));
     cudaMalloc((void **)&d_neigh_count, adjacency_size * sizeof(int));
     cudaMalloc((void **)&d_wtd_neigh_count, adjacency_size*sizeof(float));
-    
+    cudaMalloc((void **)&d_added_neigh_count, adjacency_size*sizeof(float));
+    cudaMalloc((void **)&d_prod_neigh_count, adjacency_size*sizeof(float));
+
     cudaMemset(d_int_neigh_count, 0, adjacency_size * sizeof(int));
     cudaMemset(d_neigh_count, 0, adjacency_size*sizeof(int));
     cudaMemset(d_wtd_neigh_count, 0.0, adjacency_size*sizeof(float));
+    cudaMemset(d_added_neigh_count, 0.0, adjacency_size*sizeof(float));
+    cudaMemset(d_prod_neigh_count, 0.0, adjacency_size*sizeof(float));
 
     cudaMemcpy(d_adjacency_matrix, h_adjacency_matrix, adjacency_size * sizeof(float), cudaMemcpyHostToDevice);
     
@@ -124,10 +142,7 @@ int main()
     int h_degrees[nodes];
     cudaMemcpy(h_degrees, d_degrees, nodes * sizeof(int), cudaMemcpyDeviceToHost);
 
-    for(int i=0; i<nodes; i++)
-        cout<<h_degrees[i]<<"\n";
-     
-
+    
     dim3 block_size(BLOCK_SIZE, BLOCK_SIZE);
     dim3 grid_size((nodes + BLOCK_SIZE - 1) / BLOCK_SIZE, (nodes + BLOCK_SIZE - 1) / BLOCK_SIZE);
 
@@ -165,8 +180,11 @@ int main()
 
     cudaDeviceSynchronize();
 
-    int h_wtd_neigh_count[nodes][nodes];
+    float h_wtd_neigh_count[nodes][nodes];
     cudaMemcpy(h_wtd_neigh_count, d_wtd_neigh_count, adjacency_size*sizeof(float), cudaMemcpyDeviceToHost);
+
+    for(int i=0; i<nodes; i++)
+        cout<<h_degrees[i]<<"\n";
 
     cout<<"\n Weighted Neighbourhood Count : \n";
     for(int i=0; i<nodes; i++)
@@ -176,10 +194,38 @@ int main()
         cout << endl;
     }
 
+    add_prod_kernel<<<grid_size, block_size>>>(d_adjacency_matrix, d_wtd_neigh_count, d_added_neigh_count, d_prod_neigh_count, nodes);
+
+    cudaDeviceSynchronize();
+
+    float h_added_neigh_count[nodes][nodes];
+    float h_prod_neigh_count[nodes][nodes];
+
+    cudaMemcpy(h_added_neigh_count, d_added_neigh_count, adjacency_size*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_prod_neigh_count, d_prod_neigh_count, adjacency_size*sizeof(float), cudaMemcpyDeviceToHost);
+
+    cout<<"\n Added Neighbourhood Count : \n";
+    for(int i=0; i<nodes; i++)
+    {
+        for(int j=0; j<nodes; j++)
+            cout << h_added_neigh_count[i][j] << " ";
+        cout << endl;
+    }
+
+    cout<<"\n Product Neighbourhood Count : \n";
+    for(int i=0; i<nodes; i++)
+    {
+        for(int j=0; j<nodes; j++)
+            cout << h_prod_neigh_count[i][j] << " ";
+        cout << endl;
+    }
+
     cudaFree(d_degrees);
     cudaFree(d_adjacency_matrix);
     cudaFree(d_int_neigh_count);
     cudaFree(d_neigh_count);
     cudaFree(d_wtd_neigh_count);
+    cudaFree(d_added_neigh_count);
+    cudaFree(d_prod_neigh_count);
 
 }
